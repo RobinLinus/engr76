@@ -29,7 +29,7 @@ export class AudioBackend {
     this.stats = {offlineTransmissions: 0, microphoneTransmissions: 0, permissionRequests: 0};
   }
 
-  async enableMicrophone() {
+  async enableMicrophone(deviceId = '') {
     if (this.busy || this.enabling) throw new Error('Wait for the current audio action to finish.');
     this.enabling = true;
     let timer, stream, context, generation;
@@ -43,6 +43,7 @@ export class AudioBackend {
       const setup = async () => {
         stream = await navigator.mediaDevices.getUserMedia({audio: {
           echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1,
+          ...(deviceId ? {deviceId: {exact: deviceId}} : {}),
         }});
         if (this.generation !== generation) {
           stream.getTracks().forEach(track => track.stop());

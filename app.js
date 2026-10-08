@@ -10,6 +10,7 @@ const enableMic = document.querySelector('#enable-mic');
 const runMic = document.querySelector('#run-mic');
 const stopMic = document.querySelector('#stop-mic');
 const micStatus = document.querySelector('#mic-status');
+const micDevice = document.querySelector('#microphone-device');
 const runtime = new PythonAudioRuntime(line => {
   document.querySelector('#output').textContent += `${line}\n`;
 });
@@ -27,6 +28,25 @@ function setButtons() {
   run.disabled = compare.disabled = enableMic.disabled = active || !runtime.pyodide;
   runMic.disabled = active || !micEnabled;
   stopMic.disabled = active || !micEnabled;
+  micDevice.disabled = active || !runtime.pyodide;
+}
+async function refreshMicrophones(selectedId = micDevice.value) {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  const inputs = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === 'audioinput');
+  const previous = selectedId;
+  micDevice.replaceChildren();
+  for (const [index, device] of inputs.entries()) {
+    const option = document.createElement('option');
+    option.value = device.deviceId;
+    option.textContent = device.label || `Microphone ${index + 1}`;
+    micDevice.append(option);
+  }
+  if (!inputs.length) {
+    const option = document.createElement('option');
+    option.value = ''; option.textContent = 'Browser default'; micDevice.append(option);
+  }
+  micDevice.value = inputs.some(device => device.deviceId === previous) ? previous
+    : (inputs.find(device => device.deviceId === 'default')?.deviceId || inputs[0]?.deviceId || '');
 }
 async function sha256(text) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
@@ -105,11 +125,25 @@ run.addEventListener('click', () => action(async () => {
 }));
 compare.addEventListener('click', () => action(compareExample));
 enableMic.addEventListener('click', () => action(async () => {
+  micEnabled = false;
+  micStatus.textContent = 'Microphone is off while setup is in progress.';
   setStatus('Waiting for microphone permission…');
-  const rate = await runtime.audio.enableMicrophone();
+  let rate;
+  try { rate = await runtime.audio.enableMicrophone(micDevice.value); }
+  catch (error) {
+    micStatus.textContent = 'Microphone is off. Setup failed; you can try again.';
+    throw error;
+  }
   micEnabled = true;
-  micStatus.textContent = `Microphone enabled. Device rate: ${rate.toLocaleString()} Hz. Capture happens only when you run the microphone test.`;
+  const track = runtime.audio.stream?.getAudioTracks()[0];
+  micStatus.textContent = `Microphone enabled: ${track?.label || 'selected input'}. Device rate: ${rate.toLocaleString()} Hz. Capture happens only when you run the microphone test.`;
+  try { await refreshMicrophones(track?.getSettings().deviceId || micDevice.value); } catch { /* Device labels are optional; capture remains available. */ }
   setStatus('Microphone is ready. No recording has started.');
+}));
+micDevice.addEventListener('change', () => action(async () => {
+  await runtime.close(); micEnabled = false;
+  micStatus.textContent = 'Microphone is off. Enable the selected input to use it.';
+  setStatus('Microphone input changed. Enable it before recording.');
 }));
 runMic.addEventListener('click', () => action(async () => {
   setStatus('Playing and recording the short Python signal…');
@@ -122,8 +156,13 @@ runMic.addEventListener('click', () => action(async () => {
       return;
     }
     const data = await runtime.run(source.value, 'microphone');
-    plot(data); result.textContent = `${summarize(data)}\n\nPhysical audio: delay and noise depend on your devices.`;
-    setStatus('The microphone test finished. Audio was processed in this page.');
+    const silent = data.received_samples.every(sample => sample === 0);
+    plot(data); result.textContent = `${summarize(data)}\n\n${silent
+      ? 'Only silence was received. Check your microphone, input device and speaker volume; audio transmission is not verified.'
+      : 'Physical audio: delay and noise depend on your devices.'}`;
+    setStatus(silent
+      ? 'Capture completed, but the microphone returned only silence.'
+      : 'The microphone test finished. Audio was processed in this page.', silent);
   } finally {
     await runtime.close(); micEnabled = false;
     micStatus.textContent = 'Microphone is off.';
@@ -175,6 +214,7 @@ try {
   document.querySelector('#checks').textContent = JSON.stringify(checks, null, 2);
   document.body.dataset.contract = 'passed';
   document.body.dataset.ready = 'true';
+  try { await refreshMicrophones(); } catch { /* Keep the browser-default option if enumeration is unavailable. */ }
   setButtons();
   setStatus('Ready. Python, NumPy and SciPy are loaded. Microphone is off.');
 } catch (error) {

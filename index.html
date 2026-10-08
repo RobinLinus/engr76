@@ -24,6 +24,9 @@
   </section>
   <details><summary>Try your speaker and microphone</summary>
     <p>This plays a short sound and records your microphone for the same duration. Audio stays in this page. Use a quiet space and low device volume. The physical channel adds delay and noise.</p>
+    <label for="microphone-device">Microphone input</label>
+    <select id="microphone-device" disabled><option value="">Browser default</option></select>
+    <p>Choose a physical microphone for speaker-to-microphone tests. Virtual audio inputs may return silence.</p>
     <div class="actions"><button id="enable-mic" class="secondary" disabled>Enable microphone</button><button id="run-mic" disabled>Run with microphone</button><button id="stop-mic" class="secondary" disabled>Turn microphone off</button></div>
     <p id="mic-status">Microphone is off.</p>
   </details>
