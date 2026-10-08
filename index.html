@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Python audio lab</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<main>
+  <header><p class="eyebrow">PROJECT 2 · LOCAL PROTOTYPE</p><h1>Python. In either place.</h1>
+  <p class="intro">Write Python as usual. The supplied channel runs locally or through your browser’s audio tools.</p></header>
+  <div id="status" role="status">Loading the Python environment…</div>
+  <section class="lab">
+    <div class="code"><label for="source">Your Python code</label>
+      <div id="drop-zone"><label for="files">Drop Python files and assets here, or choose files</label><input id="files" type="file" multiple disabled><p id="file-list">Files stay in this browser session.</p></div>
+      <textarea id="source" spellcheck="false" aria-label="Python source" disabled></textarea></div>
+    <div class="results"><h2>Try the same code</h2><p>The loopback test uses Web Audio without playing sound or opening your microphone.</p>
+      <button id="run" disabled>Run in browser</button><button id="compare" class="secondary" disabled>Compare with local Python</button>
+      <canvas id="waveform" width="840" height="220" aria-label="Input and received waveform"></canvas>
+      <p class="legend"><span class="input">● Input</span> <span class="received">● Received</span></p>
+      <pre id="result" aria-live="polite">Your results will appear here.</pre>
+    </div>
+  </section>
+  <details><summary>Try your speaker and microphone</summary>
+    <p>This plays a short sound and records your microphone for the same duration. Audio stays in this page. Use a quiet space and low device volume. The physical channel adds delay and noise.</p>
+    <div class="actions"><button id="enable-mic" class="secondary" disabled>Enable microphone</button><button id="run-mic" disabled>Run with microphone</button><button id="stop-mic" class="secondary" disabled>Turn microphone off</button></div>
+    <p id="mic-status">Microphone is off.</p>
+  </details>
+  <details><summary>How this prototype works</summary><p>The exact same Python example runs in native Python and in browser WebAssembly. NumPy and SciPy remain Python dependencies. Our adapter handles Web Audio. The local comparison is a saved result from the original example; editing the example does not rerun local Python.</p><p>This is a staff prototype. Existing Project 2 notebooks and physical audio reliability have not yet been qualified.</p><pre id="checks"></pre><pre id="verification"></pre></details>
+  <pre id="output" hidden></pre>
+</main>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
