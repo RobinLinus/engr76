@@ -1,7 +1,7 @@
-import { IndependentAudio } from './audio.js?v=2a-simple-1';
-import { PythonRuntime } from './runtime.js?v=2a-simple-1';
-import { ClientController } from './controller.js?v=2a-simple-1';
-import { maxBytes, messageInfo } from './limits.js?v=2a-simple-1';
+import { IndependentAudio } from './audio.js';
+import { PythonRuntime } from './runtime.js';
+import { ClientController } from './controller.js';
+import { maxBytes, messageInfo } from './limits.js';
 
 export function mount(document, window, { runtime = new PythonRuntime(), audio = new IndependentAudio() } = {}) {
   const get = id => document.getElementById(id);

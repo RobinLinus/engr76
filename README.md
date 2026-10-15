@@ -4,12 +4,12 @@ A small browser experiment: enter a message, choose **50, 100 or 200 bits/s**, a
 
 **Open the app:** [robinlinus.github.io/engr76](https://robinlinus.github.io/engr76/) redirects to the existing [robinlinus.com/engr76](https://robinlinus.com/engr76/) Pages domain.
 
-1. Reload the page on both devices, check that both show **Revision 2a-simple-1**, and choose the same rate.
+1. Open or reload the page on both devices and choose the same rate.
 2. On the receiver, press **Receive**, allow microphone access and wait for “listening.”
 3. Enter a message on the sender and press **Send**.
 4. After the tone ends, press **Stop** on the receiver. The actual decoded text appears; errors may remain. Invalid UTF-8 is displayed with replacement characters (�).
 
-Use nearby devices, a quiet room and a comfortable volume. Keep the receiving page open. Recording ends automatically after 20 seconds; sending is limited to 15 seconds. Maximum message sizes are 88 UTF-8 bytes at 50 bits/s, 181 at 100 bits/s and 256 at 200 bits/s. Both devices need the same revision after this wire-format update.
+Use nearby devices, a quiet room and a comfortable volume. Keep the receiving page open. Recording ends automatically after 20 seconds; sending is limited to 15 seconds. Maximum message sizes are 88 UTF-8 bytes at 50 bits/s, 181 at 100 bits/s and 256 at 200 bits/s. Reload both devices after an update.
 
 ## Implementation
 

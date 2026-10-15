@@ -1,4 +1,4 @@
-import { SAMPLE_RATE, MAX_CAPTURE_SECONDS, MAX_SEND_SECONDS } from './limits.js?v=2a-simple-1';
+import { SAMPLE_RATE, MAX_CAPTURE_SECONDS, MAX_SEND_SECONDS } from './limits.js';
 
 const stopped = () => new DOMException('Stopped.', 'AbortError');
 const releaseSafely = action => { try { action(); } catch { /* Continue releasing other resources. */ } };
@@ -150,7 +150,7 @@ export class IndependentAudio {
       if (session.context.state !== 'running') throw new Error('Audio could not start. Tap Receive again.');
       validSampleRate(session.context.sampleRate);
       if (!session.context.audioWorklet) throw new Error('AudioWorklet is unavailable. Use a current browser over HTTPS.');
-      await session.context.audioWorklet.addModule(new URL('./capture-worklet.js?v=2a-simple-1', import.meta.url));
+      await session.context.audioWorklet.addModule(new URL('./capture-worklet.js', import.meta.url));
       this._check(session);
       const stream = await this.mediaDevices.getUserMedia({
         audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false },

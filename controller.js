@@ -1,5 +1,5 @@
-import { messageInfo, validateRate } from './limits.js?v=2a-simple-1';
-import { resampleToCodec } from './audio.js?v=2a-simple-1';
+import { messageInfo, validateRate } from './limits.js';
+import { resampleToCodec } from './audio.js';
 
 export class ClientController {
   constructor({ runtime, audio, update }) {
