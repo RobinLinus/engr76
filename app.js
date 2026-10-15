@@ -20,7 +20,7 @@ export function mount(document, window, { runtime = new PythonRuntime(), audio =
         return;
       }
       const info = messageInfo(message.value, Number(rate.value));
-      hint.textContent = `${info.bytes} / ${maxBytes(Number(rate.value))} UTF-8 bytes · ${info.seconds.toFixed(2)} seconds`;
+      hint.textContent = `${info.bytes} / ${maxBytes(Number(rate.value))} UTF-8 bytes · about ${info.seconds.toFixed(2)} seconds`;
     } catch (error) {
       hint.textContent = error.message;
       hint.classList.add('invalid');

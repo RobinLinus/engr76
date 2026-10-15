@@ -1,7 +1,15 @@
 // The only boundary into Python. The receive call has no text/length argument.
-export function createCodecBridge(pyodide) {
-  const codec = pyodide.pyimport('project2a');
+export function createCodecBridge(pyodide, notebookContent) {
+  const host = pyodide.pyimport('host_codec');
+  let codec;
+  try { codec = host.create_codec(notebookContent); }
+  finally { host.destroy(); }
   return {
+    sourceInfo() {
+      const result = codec.source_info();
+      try { return result.toJs({ dict_converter: Object.fromEntries, create_pyproxies: false }); }
+      finally { result.destroy(); }
+    },
     encode(text, rate) {
       const result = codec.encode_message(text, rate);
       try { return new Float32Array(result.toJs()); }

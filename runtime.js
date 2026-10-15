@@ -6,10 +6,14 @@ export class PythonRuntime {
     this.nextId = 0;
     this.worker = null;
     this.ready = false;
+    this.sourceInfo = null;
   }
 
-  init() {
-    if (this.ready) return Promise.resolve();
+  init({ notebookContent } = {}) {
+    if (notebookContent !== undefined && (this.ready || this.loading)) {
+      return Promise.reject(new Error('Use a fresh runtime to load different notebook content.'));
+    }
+    if (this.ready) return Promise.resolve(this.sourceInfo);
     if (this.loading) return this.loading;
     try {
       this.worker = new this.WorkerClass(new URL('./runtime-worker.js', import.meta.url), { type: 'module' });
@@ -28,8 +32,12 @@ export class PythonRuntime {
       this.worker.onmessageerror = () => {
         if (this.worker === worker) this.dispose(new Error('Python returned unreadable data. Please reload.'));
       };
-      this.loading = this.request('init').then(() => {
-        if (this.worker === worker) this.ready = true;
+      this.loading = this.request('init', notebookContent === undefined ? {} : { notebookContent }).then(info => {
+        if (this.worker === worker) {
+          this.ready = true;
+          this.sourceInfo = info;
+        }
+        return info;
       }).catch(error => {
         // A cancelled startup may reject after Retry has created a new worker.
         if (this.worker === worker) this.dispose(error);
@@ -64,6 +72,7 @@ export class PythonRuntime {
     this.worker?.terminate();
     this.worker = null;
     this.ready = false;
+    this.sourceInfo = null;
     this.loading = null;
     for (const request of this.pending.values()) {
       clearTimeout(request.timer);

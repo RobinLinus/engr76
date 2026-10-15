@@ -1,6 +1,6 @@
 # Project 2A — Messages through sound
 
-A small browser experiment: enter a message, choose **50, 100 or 200 bits/s**, and send it through a speaker. A second device independently records and decodes it. Both browsers fetch [project2a.py](project2a.py) and run the Python OOK algorithms locally with Pyodide and NumPy.
+A small browser experiment: enter a message, choose **50, 100 or 200 bits/s**, and send it through a speaker. A second device independently records and decodes it. Both browsers fetch [project2a.ipynb](project2a.ipynb) and run its selected Python OOK functions locally with Pyodide and NumPy.
 
 **Open the app:** [robinlinus.github.io/engr76](https://robinlinus.github.io/engr76/) redirects to the existing [robinlinus.com/engr76](https://robinlinus.com/engr76/) Pages domain.
 
@@ -15,7 +15,9 @@ Use nearby devices, a quiet room and a comfortable volume. Keep the receiving pa
 
 The reference uses 44,100 Hz samples, a 2,000 Hz carrier, continuous-phase on-off keying, first RMS crossing and the 2A starter's mean-energy demodulation threshold. The sender and receiver call the public Python algorithm functions. A separate framing helper carries a fixed preamble, a two-byte length and UTF-8 text. Reception receives only recorded samples and the selected rate. It does not receive the sender's text or length through the application. There is no checksum or payload-integrity gate; the decoder retains actual payload bytes and bits alongside best-effort text. Preamble, length and complete-recording checks locate and bound the message.
 
-The browser supplies real speaker/microphone I/O and converts the actual capture sample rate. Python runs in a Web Worker; the microphone uses an AudioWorklet. Audio tracks are stopped on Stop, errors and page exit. There is no upload, server message exchange, pairing, return protocol or error correction. The bundled Python reference was newly authored for this demonstration from the 2A algorithm requirements.
+The browser supplies real speaker/microphone I/O and converts the actual capture sample rate. Python runs in a Web Worker; the microphone uses an AudioWorklet. Audio tracks are stopped on Stop, errors and page exit. There is no upload, server message exchange, pairing, return protocol or error correction.
+
+The bundled notebook is explicitly a **demo reference**, derived from this app's previously public Python implementation. It is not a student submission or an instructor solution. The importer selects `generate_modulated_signal`, `add_silence`, `detect_start` and `demodulate`, with their supported helper declarations, imports and constants. It ignores markdown, saved outputs and top-level notebook experiments. The actual original function bodies run; missing or unsupported code produces an error instead of a fallback solution. Host text/length framing remains separate. Notebook upload is not implemented yet.
 
 This is a simple teaching experiment: earlier loud sounds, echoes, clipping, noise, device processing or clock drift can produce errors or prevent acquisition. Numerical and controlled-capture tests do not establish successful laptop-to-phone acoustic message reception. The selected 50/100/200 rates are this client's controls, not the full set of assignment experiments.
 

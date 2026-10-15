@@ -1,4 +1,4 @@
-import { messageInfo, validateRate } from './limits.js';
+import { messageInfo, validateRate, SAMPLE_RATE } from './limits.js';
 import { resampleToCodec } from './audio.js';
 
 export class ClientController {
@@ -40,14 +40,14 @@ export class ClientController {
     if (!this.ready || !['idle', 'error'].includes(this.state)) return;
     const generation = ++this.generation;
     try {
-      const info = messageInfo(text, rate);
+      messageInfo(text, rate);
       this.show('preparing', 'Preparing the tone…');
       await this.audio.preparePlayback();
       if (generation !== this.generation) return;
       const samples = await this.runtime.encode(text, rate);
       if (generation !== this.generation) return;
       const playback = this.audio.play(samples);
-      this.show('sending', `Sending through the speaker · ${info.seconds.toFixed(1)} seconds.`, '');
+      this.show('sending', `Sending through the speaker · ${(samples.length / SAMPLE_RATE).toFixed(1)} seconds.`, '');
       await playback;
       if (generation === this.generation) this.show('idle', 'Tone finished. On the receiving device, press Stop to decode.');
     } catch (error) { this.fail(error, generation); }
