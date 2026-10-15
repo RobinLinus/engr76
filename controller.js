@@ -1,5 +1,5 @@
-import { messageInfo, validateRate } from './limits.js';
-import { resampleToCodec } from './audio.js';
+import { messageInfo, validateRate } from './limits.js?v=2a-simple-1';
+import { resampleToCodec } from './audio.js?v=2a-simple-1';
 
 export class ClientController {
   constructor({ runtime, audio, update }) {
@@ -74,13 +74,13 @@ export class ClientController {
     if (this.state === 'receiving') {
       const generation = this.generation;
       const rate = this.receiveRate;
-      this.show('decoding', 'Microphone stopped. Checking the recorded message…');
+      this.show('decoding', 'Microphone stopped. Decoding the recording…');
       try {
         const capture = await this.audio.finishCapture();
         if (generation !== this.generation) return;
         const samples = resampleToCodec(capture.samples, capture.sampleRate);
-        const message = await this.runtime.decode(samples, rate);
-        if (generation === this.generation) this.show('idle', 'Message received · checksum verified.', message);
+        const decoded = await this.runtime.decode(samples, rate);
+        if (generation === this.generation) this.show('idle', 'Recording decoded. Errors may remain.', decoded.text);
       } catch (error) { this.fail(error, generation); }
       return;
     }

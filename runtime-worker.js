@@ -1,4 +1,4 @@
-import { createCodecBridge } from './python-bridge.js';
+import { createCodecBridge } from './python-bridge.js?v=2a-simple-1';
 
 const CDN = 'https://cdn.jsdelivr.net/pyodide/v314.0.7/full/';
 let codec;
@@ -10,7 +10,7 @@ self.onmessage = async ({ data }) => {
       const { loadPyodide } = await import(`${CDN}pyodide.mjs`);
       const pyodide = await loadPyodide({ indexURL: CDN, enableRunUntilComplete: false });
       await pyodide.loadPackage('numpy');
-      const response = await fetch(new URL('./project2a.py', import.meta.url));
+      const response = await fetch(new URL('./project2a.py?v=2a-simple-1', import.meta.url), { cache: 'no-store' });
       if (!response.ok) throw new Error(`Could not load project2a.py (${response.status}).`);
       pyodide.FS.writeFile('/home/pyodide/project2a.py', await response.text());
       codec = createCodecBridge(pyodide);

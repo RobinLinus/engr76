@@ -4,20 +4,20 @@ A small browser experiment: enter a message, choose **50, 100 or 200 bits/s**, a
 
 **Open the app:** [robinlinus.github.io/engr76](https://robinlinus.github.io/engr76/) redirects to the existing [robinlinus.com/engr76](https://robinlinus.com/engr76/) Pages domain.
 
-1. Open the page on both devices and choose the same rate.
+1. Reload the page on both devices, check that both show **Revision 2a-simple-1**, and choose the same rate.
 2. On the receiver, press **Receive**, allow microphone access and wait for “listening.”
 3. Enter a message on the sender and press **Send**.
-4. After the tone ends, press **Stop** on the receiver. A message appears only after its checksum and UTF-8 decoding succeed.
+4. After the tone ends, press **Stop** on the receiver. The actual decoded text appears; errors may remain. Invalid UTF-8 is displayed with replacement characters (�).
 
-Use nearby devices, a quiet room and a comfortable volume. Keep the receiving page open. Recording ends automatically after 20 seconds; sending is limited to 15 seconds. Maximum message sizes are 86 UTF-8 bytes at 50 bits/s, 179 at 100 bits/s and 256 at 200 bits/s.
+Use nearby devices, a quiet room and a comfortable volume. Keep the receiving page open. Recording ends automatically after 20 seconds; sending is limited to 15 seconds. Maximum message sizes are 88 UTF-8 bytes at 50 bits/s, 181 at 100 bits/s and 256 at 200 bits/s. Both devices need the same revision after this wire-format update.
 
 ## Implementation
 
-The reference uses 44,100 Hz samples, a 2,000 Hz carrier, continuous-phase on-off keying, RMS start detection and symbol-energy demodulation. A separate framing helper carries a fixed preamble, a two-byte length, UTF-8 text and CRC16. Reception receives only recorded samples and the selected rate. It does not receive the sender's text or length through the application.
+The reference uses 44,100 Hz samples, a 2,000 Hz carrier, continuous-phase on-off keying, first RMS crossing and the 2A starter's mean-energy demodulation threshold. The sender and receiver call the public Python algorithm functions. A separate framing helper carries a fixed preamble, a two-byte length and UTF-8 text. Reception receives only recorded samples and the selected rate. It does not receive the sender's text or length through the application. There is no checksum or payload-integrity gate; the decoder retains actual payload bytes and bits alongside best-effort text. Preamble, length and complete-recording checks locate and bound the message.
 
 The browser supplies real speaker/microphone I/O and converts the actual capture sample rate. Python runs in a Web Worker; the microphone uses an AudioWorklet. Audio tracks are stopped on Stop, errors and page exit. There is no upload, server message exchange, pairing, return protocol or error correction. The bundled Python reference was newly authored for this demonstration from the 2A algorithm requirements.
 
-This is a simple teaching experiment: earlier loud sounds, echoes, clipping, noise, device processing or clock drift can prevent decoding. Numerical tests and local Chrome playback/capture checks passed; successful laptop-to-phone acoustic message reception has not yet been established.
+This is a simple teaching experiment: earlier loud sounds, echoes, clipping, noise, device processing or clock drift can produce errors or prevent acquisition. Numerical and controlled-capture tests do not establish successful laptop-to-phone acoustic message reception. The selected 50/100/200 rates are this client's controls, not the full set of assignment experiments.
 
 ## Static hosting and local preview
 

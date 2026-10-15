@@ -1,12 +1,11 @@
 """Small Project 2A OOK reference, authored from the unimplemented starters.
 
 The three public signal functions implement the starter algorithms. Framing below
-is separate: D391 preamble | uint16 byte length | UTF-8 | CRC16-CCITT-FALSE.
+is separate: D391 preamble | uint16 byte length | UTF-8 payload.
 All bytes/bits are big-endian. Only NumPy and the Python standard library are used.
 See README.md for acquisition choices and acoustic limitations.
 """
 
-import binascii
 import math
 import numbers
 
@@ -20,11 +19,11 @@ MAX_SEND_SECONDS = 15
 MAX_CAPTURE_SECONDS = 20
 GUARD_SAMPLES = 4_410  # 100 ms before and after the frame
 PREAMBLE = b"\xd3\x91"
-OVERHEAD_BITS = 48
+OVERHEAD_BITS = 32
 
 
 class DecodeError(ValueError):
-    """No verified message was recovered; safe to show the reason to the user."""
+    """Could not locate a bounded message; safe to show the reason to the user."""
 
 
 def _rate(rate):
@@ -41,13 +40,6 @@ def _samples(signal):
     if array.dtype.kind not in "fiu" or not np.all(np.isfinite(array)):
         raise ValueError("Audio samples must be finite real numbers.")
     return array.astype(np.float64, copy=False)
-
-
-def _normalized(signal):
-    peak = float(np.max(np.abs(signal)))
-    if peak < 1e-5:
-        raise DecodeError("No audible signal found. Check speaker volume and microphone access.")
-    return signal / peak  # private copy; also prevents overflow in squares
 
 
 def _sample_count(bits, rate):
@@ -70,57 +62,40 @@ def generate_modulated_signal(message, rate, fc):
 
 
 def detect_start(signal, visual_test=False):
-    """First absolute-value crossing of an RMS-derived threshold.
+    """First absolute-value crossing of signal RMS (scalar multiplier: 1).
 
-    A half-peak-block-RMS floor (10 ms blocks) prevents long idle silence from
-    lowering the threshold into modest background noise. No preamble search,
-    frequency correlation, carrier recovery or streaming modem is hidden here.
     visual_test retains the starter's optional visualize hook if supplied by a host.
     """
     array = _samples(signal)
-    normalized = _normalized(array)
-    power = normalized ** 2
-    block = fs // 100
-    starts = np.arange(0, len(array), block)
-    counts = np.minimum(block, len(array) - starts)
-    block_rms = np.sqrt(np.add.reduceat(power, starts) / counts)
-    threshold = max(float(np.sqrt(np.mean(power))), 0.5 * float(block_rms.max()))
+    peak = float(np.max(np.abs(array)))
+    normalized = array / peak if peak else array  # scale only; no amplitude floor
+    threshold = float(np.sqrt(np.mean(normalized ** 2)))
     crossings = np.flatnonzero(np.abs(normalized) > threshold)
     if not crossings.size:
         raise DecodeError("No clear signal start found. Try again in a quieter room.")
     start = int(crossings[0])
     if visual_test and callable(globals().get("visualize")):
-        visualize(array, threshold * float(np.max(np.abs(array))), start, None)
+        visualize(array, threshold * peak, start, None)
     return start
 
 
-def _origin(signal):
-    # First crossing is slightly after the sine starts. Back off at most a quarter
-    # of the fixed carrier period (6 samples), well below one 200-bps symbol.
-    return max(0, detect_start(signal) - math.ceil(fs / (4 * CARRIER)))
-
-
-def _bits_at(signal, rate, length, start):
-    count = _sample_count(length, rate)
-    if len(signal) - start < count:
-        raise DecodeError("Incomplete recording. Start Receive before Send and wait for the tone to finish.")
-    frame = signal[start:start + count]
-    power = frame ** 2
-    # The threshold only sees the requested symbols, never trailing idle audio.
-    threshold = float(np.mean(power)) / 2
-    groups = np.floor(np.arange(count) * rate / fs).astype(np.int64)
-    energies = np.bincount(groups, weights=power, minlength=length)
-    counts = np.bincount(groups, minlength=length)
-    return (energies / counts > threshold).astype(np.uint8)
-
-
 def demodulate(signal, rate, length):
-    """Recover length bits using first-crossing alignment and mean symbol power."""
+    """Use the first RMS crossing and half the power of ALL remaining samples."""
     rate = _rate(rate)
     if isinstance(length, (bool, np.bool_)) or not isinstance(length, numbers.Integral) or not 0 < length <= rate * MAX_SEND_SECONDS:
         raise ValueError("Expected bit length must be a positive bounded integer.")
     array = _samples(signal)
-    return _bits_at(_normalized(array), rate, int(length), _origin(array))
+    start_index = detect_start(array)
+    length = int(length)
+    count = _sample_count(length, rate)
+    if len(array) - start_index < count:
+        raise DecodeError("Incomplete recording. Start Receive before Send and wait for the tone to finish.")
+    bit_threshold = np.mean(array[start_index:] ** 2) / 2
+    power = array[start_index:start_index + count] ** 2
+    groups = np.floor(np.arange(count) * rate / fs).astype(np.int64)
+    energies = np.bincount(groups, weights=power, minlength=length)
+    counts = np.bincount(groups, minlength=length)
+    return (energies / counts > bit_threshold).astype(np.uint8)
 
 
 def max_payload_bytes(rate):
@@ -152,8 +127,7 @@ def encode_message(text, rate):
         raise ValueError("Message contains invalid Unicode.") from error
     count = transmission_samples(len(payload), rate)
     body = len(payload).to_bytes(2, "big") + payload
-    checksum = binascii.crc_hqx(body, 0xFFFF).to_bytes(2, "big")
-    bits = np.unpackbits(np.frombuffer(PREAMBLE + body + checksum, dtype=np.uint8), bitorder="big")
+    bits = np.unpackbits(np.frombuffer(PREAMBLE + body, dtype=np.uint8), bitorder="big")
     wave = generate_modulated_signal(bits, rate, CARRIER)
     result = np.zeros(count, dtype=np.float32)
     result[GUARD_SAMPLES:GUARD_SAMPLES + wave.size] = 0.8 * wave
@@ -161,12 +135,10 @@ def encode_message(text, rate):
 
 
 def decode_recording(samples, rate):
-    """Only recording + rate enter this function. No sender state is retained."""
+    """Return actual payload bytes/bits and best-effort text from samples + rate."""
     rate = _rate(rate)
     array = _samples(samples)
-    start = _origin(array)  # acquire ONCE: header and full frame have the same clock
-    normalized = _normalized(array)
-    header_bits = _bits_at(normalized, rate, 32, start)
+    header_bits = demodulate(array, rate, 32)
     header = np.packbits(header_bits, bitorder="big").tobytes()
     if header[:2] != PREAMBLE:
         raise DecodeError("Preamble not found. Check that both devices use the same rate and try a quieter room.")
@@ -175,14 +147,13 @@ def decode_recording(samples, rate):
         transmission_samples(byte_length, rate)  # bounds checked BEFORE full-frame allocation
     except ValueError as error:
         raise DecodeError("Invalid length header. Check the rate or move the devices closer.") from error
-    frame_bits = _bits_at(normalized, rate, OVERHEAD_BITS + byte_length * 8, start)
+    # The same unchanged capture gives the public function the same origin and
+    # whole-tail threshold on both calls; only the requested bit count differs.
+    frame_bits = demodulate(array, rate, OVERHEAD_BITS + byte_length * 8)
     frame = np.packbits(frame_bits, bitorder="big").tobytes()
-    if frame[:4] != header:
-        raise DecodeError("Unstable signal level. Try a quieter room or a lower rate.")
-    expected = binascii.crc_hqx(frame[2:-2], 0xFFFF)
-    if int.from_bytes(frame[-2:], "big") != expected:
-        raise DecodeError("Checksum failed: the message was incomplete or corrupted. Try again.")
-    try:
-        return frame[4:-2].decode("utf-8", errors="strict")
-    except UnicodeDecodeError as error:
-        raise DecodeError("Invalid UTF-8 payload. No verified text was recovered.") from error
+    payload = frame[4:]
+    return {
+        "text": payload.decode("utf-8", errors="replace"),
+        "payload_bytes": list(payload),
+        "payload_bits": frame_bits[OVERHEAD_BITS:].tolist(),
+    }

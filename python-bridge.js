@@ -9,7 +9,11 @@ export function createCodecBridge(pyodide) {
     },
     decode(samples, rate) {
       const input = pyodide.toPy(samples);
-      try { return codec.decode_recording(input, rate); }
+      try {
+        const result = codec.decode_recording(input, rate);
+        try { return result.toJs({ dict_converter: Object.fromEntries, create_pyproxies: false }); }
+        finally { result.destroy(); }
+      }
       finally { input.destroy(); }
     },
     destroy() { codec.destroy(); },

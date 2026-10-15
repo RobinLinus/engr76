@@ -10,7 +10,7 @@ export function validateRate(rate) {
 
 export function maxBytes(rate) {
   validateRate(rate);
-  return Math.min(256, Math.floor((Math.floor(14.8 * rate) - 48) / 8));
+  return Math.min(256, Math.floor((Math.floor(14.8 * rate) - 32) / 8));
 }
 
 export function messageInfo(text, rate) {
@@ -23,5 +23,5 @@ export function messageInfo(text, rate) {
   if (text.length > 512) throw new Error('Message exceeds 256 UTF-8 bytes.');
   const bytes = new TextEncoder().encode(text).length;
   if (bytes > maxBytes(rate)) throw new Error(`At ${rate} bits/s, use at most ${maxBytes(rate)} UTF-8 bytes (15-second limit).`);
-  return { bytes, seconds: (8820 + Math.ceil((48 + 8 * bytes) * SAMPLE_RATE / rate)) / SAMPLE_RATE };
+  return { bytes, seconds: (8820 + Math.ceil((32 + 8 * bytes) * SAMPLE_RATE / rate)) / SAMPLE_RATE };
 }

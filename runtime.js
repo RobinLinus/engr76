@@ -12,7 +12,7 @@ export class PythonRuntime {
     if (this.ready) return Promise.resolve();
     if (this.loading) return this.loading;
     try {
-      this.worker = new this.WorkerClass(new URL('./runtime-worker.js', import.meta.url), { type: 'module' });
+      this.worker = new this.WorkerClass(new URL('./runtime-worker.js?v=2a-simple-1', import.meta.url), { type: 'module' });
       const worker = this.worker;
       this.worker.onmessage = ({ data }) => {
         const request = this.pending.get(data.id);
