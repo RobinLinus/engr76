@@ -3,36 +3,67 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Python audio lab</title>
+  <meta name="theme-color" content="#8c1515">
+  <title>Project 2A · Messages through sound</title>
   <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
 </head>
 <body>
-<main>
-  <header><p class="eyebrow">PROJECT 2 · LOCAL PROTOTYPE</p><h1>Python. In either place.</h1>
-  <p class="intro">Write Python as usual. The supplied channel runs locally or through your browser’s audio tools.</p></header>
-  <div id="status" role="status">Loading the Python environment…</div>
-  <section class="lab">
-    <div class="code"><label for="source">Your Python code</label>
-      <div id="drop-zone"><label for="files">Drop Python files and assets here, or choose files</label><input id="files" type="file" multiple disabled><p id="file-list">Files stay in this browser session.</p></div>
-      <textarea id="source" spellcheck="false" aria-label="Python source" disabled></textarea></div>
-    <div class="results"><h2>Try the same code</h2><p>The loopback test uses Web Audio without playing sound or opening your microphone.</p>
-      <button id="run" disabled>Run in browser</button><button id="compare" class="secondary" disabled>Compare with local Python</button>
-      <canvas id="waveform" width="840" height="220" aria-label="Input and received waveform"></canvas>
-      <p class="legend"><span class="input">● Input</span> <span class="received">● Received</span></p>
-      <pre id="result" aria-live="polite">Your results will appear here.</pre>
-    </div>
-  </section>
-  <details><summary>Try your speaker and microphone</summary>
-    <p>This plays a short sound and records your microphone for the same duration. Audio stays in this page. Use a quiet space and low device volume. The physical channel adds delay and noise.</p>
-    <label for="microphone-device">Microphone input</label>
-    <select id="microphone-device" disabled><option value="">Browser default</option></select>
-    <p>Choose a physical microphone for speaker-to-microphone tests. Virtual audio inputs may return silence.</p>
-    <div class="actions"><button id="enable-mic" class="secondary" disabled>Enable microphone</button><button id="run-mic" disabled>Run with microphone</button><button id="stop-mic" class="secondary" disabled>Turn microphone off</button></div>
-    <p id="mic-status">Microphone is off.</p>
-  </details>
-  <details><summary>How this prototype works</summary><p>The exact same Python example runs in native Python and in browser WebAssembly. NumPy and SciPy remain Python dependencies. Our adapter handles Web Audio. The local comparison is a saved result from the original example; editing the example does not rerun local Python.</p><p>This is a staff prototype. Existing Project 2 notebooks and physical audio reliability have not yet been qualified.</p><pre id="checks"></pre><pre id="verification"></pre></details>
-  <pre id="output" hidden></pre>
-</main>
-<script type="module" src="./app.js"></script>
+  <main>
+    <header>
+      <p class="eyebrow">ENGR 76 <span aria-hidden="true">/</span> Project 2A</p>
+      <h1>Messages through sound.</h1>
+      <p class="intro">Turn a short message into a tone. Let another device listen.</p>
+    </header>
+
+    <section class="guide" aria-label="How to connect two devices">
+      <ol>
+        <li><span>01</span><div>Open this page on both devices.<small>Choose the same transmission rate.</small></div></li>
+        <li><span>02</span><div>Start Receive on your phone.<small>Allow microphone access and wait for “listening.”</small></div></li>
+        <li><span>03</span><div>Send from your laptop, then Stop on your phone.<small>Wait for the tone to finish before decoding.</small></div></li>
+      </ol>
+    </section>
+
+    <section class="workspace" aria-label="Sound messenger">
+      <div class="rate-row">
+        <label for="rate">Transmission rate</label>
+        <select id="rate" aria-describedby="rate-hint">
+          <option value="50">50 bits/s</option>
+          <option value="100" selected>100 bits/s</option>
+          <option value="200">200 bits/s</option>
+        </select>
+      </div>
+      <p id="rate-hint" class="hint">Use the same rate on both devices. Try 50 bits/s if reception is difficult.</p>
+
+      <label for="message">Message</label>
+      <textarea id="message" rows="4" placeholder="Hello from my laptop!" aria-describedby="message-info limits" spellcheck="false"></textarea>
+      <p id="message-info" class="hint">Enter a short message to send.</p>
+
+      <div class="actions">
+        <button id="send" class="primary" disabled>Send</button>
+        <button id="receive" disabled>Receive</button>
+        <button id="stop" class="quiet" disabled>Stop</button>
+      </div>
+      <div class="status-row">
+        <span id="state-dot" class="state-dot" aria-hidden="true"></span>
+        <p id="status" role="status" aria-live="polite">Loading Python and NumPy…</p>
+        <button id="retry" class="retry" hidden>Retry</button>
+      </div>
+      <p id="secure-notice" class="notice" hidden>Microphone access needs HTTPS (or localhost on this device). A plain LAN HTTP address will not enable your phone’s microphone.</p>
+      <noscript><p class="notice">Enable JavaScript to run Python and audio in your browser.</p></noscript>
+
+      <div class="received">
+        <h2>Decoded message</h2>
+        <p id="decoded" aria-live="polite" class="empty">Your received message will appear here.</p>
+      </div>
+    </section>
+
+    <footer>
+      <p id="limits">Up to 15 seconds per send and 20 seconds per recording. Maximum 256 UTF-8 bytes; slower rates allow fewer bytes.</p>
+      <p>Keep the devices nearby in a quiet room, use a comfortable speaker volume, and keep this page open. This simple acoustic demo may need another try.</p>
+      <p>Encoding and decoding run locally. Only the page and Python runtime are downloaded; your message travels through sound.</p>
+      <a href="./project2a.py">View the Python reference <span aria-hidden="true">↗</span></a>
+    </footer>
+  </main>
 </body>
 </html>

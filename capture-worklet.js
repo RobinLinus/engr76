@@ -1,20 +1,42 @@
-class SampleCapture extends AudioWorkletProcessor {
-  constructor(options) {
+// Bounded real microphone capture. No synthesis and no monitor output.
+class Project2ACapture extends AudioWorkletProcessor {
+  constructor() {
     super();
-    this.samples = new Float32Array(options.processorOptions.frames);
-    this.position = 0;
+    this.buffer = new Float32Array(2048);
+    this.used = 0;
+    this.total = 0;
+    this.limit = Math.floor(sampleRate * 20);
+    this.done = false;
+    this.port.onmessage = ({ data }) => { if (data.type === 'finish') this.finish(); };
   }
-  process(inputs) {
-    const channel = inputs[0]?.[0];
-    if (!channel) return true;
-    const count = Math.min(channel.length, this.samples.length - this.position);
-    this.samples.set(channel.subarray(0, count), this.position);
-    this.position += count;
-    if (this.position === this.samples.length) {
-      this.port.postMessage(this.samples.buffer, [this.samples.buffer]);
-      return false;
+
+  flush() {
+    if (!this.used) return;
+    const samples = this.buffer.slice(0, this.used);
+    this.port.postMessage({ type: 'chunk', samples }, [samples.buffer]);
+    this.used = 0;
+  }
+
+  finish() {
+    if (this.done) return;
+    this.done = true;
+    this.flush();
+    this.port.postMessage({ type: 'done' });
+  }
+
+  process(inputs, outputs) {
+    for (const output of outputs) for (const channel of output) channel.fill(0);
+    if (this.done) return false;
+    const input = inputs[0]?.[0];
+    if (!input) return true;
+    for (let i = 0; i < input.length && this.total < this.limit; i++) {
+      this.buffer[this.used++] = input[i];
+      this.total++;
+      if (this.used === this.buffer.length) this.flush();
     }
-    return true;
+    if (this.total === this.limit) this.finish();
+    return !this.done;
   }
 }
-registerProcessor('sample-capture', SampleCapture);
+
+registerProcessor('project2a-capture', Project2ACapture);

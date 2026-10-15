@@ -1,99 +1,74 @@
-// Reusable runtime: clients supply UI, while Python owns numerical algorithms.
-import {AudioBackend} from './audio-backend.js';
-
-async function sourceFile(name) {
-  const response = await fetch(new URL(name, import.meta.url));
-  if (!response.ok) throw new Error(`Cannot load ${name}.`);
-  return response.text();
-}
-
-export class PythonAudioRuntime {
-  constructor(onOutput = () => {}, runtimeURL = new URL('https://cdn.jsdelivr.net/pyodide/v314.0.7/full/')) {
-    this.audio = new AudioBackend();
-    this.onOutput = onOutput;
-    this.pyodide = null;
-    this.busy = false;
-    this.runtimeURL = new URL(runtimeURL).href;
+export class PythonRuntime {
+  constructor({ WorkerClass = globalThis.Worker, timeout = 120000 } = {}) {
+    this.WorkerClass = WorkerClass;
+    this.timeout = timeout;
+    this.pending = new Map();
+    this.nextId = 0;
+    this.worker = null;
+    this.ready = false;
   }
-  async initialize(onStatus = () => {}) {
-    if (typeof WebAssembly.promising !== 'function') {
-      throw new Error('This prototype needs a browser with WebAssembly Promise Integration, such as current Chrome.');
+
+  init() {
+    if (this.ready) return Promise.resolve();
+    if (this.loading) return this.loading;
+    try {
+      this.worker = new this.WorkerClass(new URL('./runtime-worker.js', import.meta.url), { type: 'module' });
+      const worker = this.worker;
+      this.worker.onmessage = ({ data }) => {
+        const request = this.pending.get(data.id);
+        if (!request) return;
+        this.pending.delete(data.id);
+        clearTimeout(request.timer);
+        if (data.error) request.reject(new Error(data.error));
+        else request.resolve(data.result);
+      };
+      this.worker.onerror = () => {
+        if (this.worker === worker) this.dispose(new Error('Python could not run. Check your connection and reload.'));
+      };
+      this.worker.onmessageerror = () => {
+        if (this.worker === worker) this.dispose(new Error('Python returned unreadable data. Please reload.'));
+      };
+      this.loading = this.request('init').then(() => {
+        if (this.worker === worker) this.ready = true;
+      }).catch(error => {
+        // A cancelled startup may reject after Retry has created a new worker.
+        if (this.worker === worker) this.dispose(error);
+        throw error;
+      });
+      return this.loading;
+    } catch (error) {
+      this.dispose(error);
+      return Promise.reject(error);
     }
-    onStatus('Loading Python…');
-    const {loadPyodide} = await import(new URL('pyodide.mjs', this.runtimeURL).href);
-    this.pyodide = await loadPyodide({indexURL: this.runtimeURL, stdout: this.onOutput, stderr: this.onOutput});
-    onStatus('Loading NumPy and SciPy…');
-    await this.pyodide.loadPackage(['numpy', 'scipy']);
-    const names = ['channel.py', 'student-example.py', 'check-native.py'];
-    const sources = await Promise.all(names.map(sourceFile));
-    names.forEach((name, index) => this.pyodide.FS.writeFile(`/home/pyodide/${name}`, sources[index]));
-    this.source = sources[1];
-    this.pyodide.registerJsModule('audio_backend', {
-      transmit: (samples, sampleRate, mode) => this.audio.transmit(samples, sampleRate, mode),
+  }
+
+  request(kind, fields = {}, transfer = []) {
+    return new Promise((resolve, reject) => {
+      if (!this.worker) { reject(new Error('Python is not ready.')); return; }
+      const id = ++this.nextId;
+      const timer = setTimeout(() => this.dispose(new Error('Python timed out. Check your connection and try again.')), this.timeout);
+      this.pending.set(id, { resolve, reject, timer });
+      try { this.worker.postMessage({ id, kind, ...fields }, transfer); }
+      catch (error) { this.dispose(error); }
     });
-    await this.pyodide.runPythonAsync('import sys\nsys.path.insert(0, "/home/pyodide")\nfrom pyodide.ffi import can_run_sync\nassert can_run_sync(), "Synchronous browser bridge is unavailable"');
-    return this;
   }
-  async run(source = this.source, mode = 'loopback') {
-    if (!this.pyodide) throw new Error('Wait for Python to finish loading.');
-    if (this.busy) throw new Error('Python is already running.');
-    this.busy = true;
-    try {
-      this.pyodide.globals.set('_source', source);
-      this.pyodide.globals.set('_mode', mode);
-      const result = await this.pyodide.runPythonAsync(`
-import json
-_namespace = {"__name__": "student_example"}
-exec(compile(_source, "student-example.py", "exec"), _namespace)
-json.dumps(_namespace["run_example"](mode=_mode))
-`);
-      return JSON.parse(result);
-    } finally {
-      this.pyodide.globals.delete('_source');
-      this.pyodide.globals.delete('_mode');
-      this.busy = false;
+
+  encode(text, rate) { return this.request('encode', { text, rate }); }
+  decode(samples, rate) {
+    // Copy so transferring to the worker never detaches a caller's input array.
+    const copy = samples.slice();
+    return this.request('decode', { samples: copy, rate }, [copy.buffer]);
+  }
+
+  dispose(reason = new Error('Stopped.')) {
+    this.worker?.terminate();
+    this.worker = null;
+    this.ready = false;
+    this.loading = null;
+    for (const request of this.pending.values()) {
+      clearTimeout(request.timer);
+      request.reject(reason);
     }
+    this.pending.clear();
   }
-  async contractChecks() {
-    if (this.busy) throw new Error('Python is already running.');
-    this.busy = true;
-    try {
-      return JSON.parse(await this.pyodide.runPythonAsync(`
-import json
-_checks = {"__name__": "browser_checks"}
-exec(compile(open("/home/pyodide/check-native.py").read(), "check-native.py", "exec"), _checks)
-json.dumps(_checks["run_contract_checks"]())
-`));
-    } finally { this.busy = false; }
-  }
-  addFile(name, bytes) {
-    if (!this.pyodide || this.busy) throw new Error('Wait until Python is ready.');
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(name) || ['channel.py', 'student-example.py', 'check-native.py', 'native-backend.py'].includes(name)) {
-      throw new Error('Choose a filename that does not replace the supplied runtime files.');
-    }
-    if (bytes.length > 2 * 1024 * 1024) throw new Error('This prototype accepts files up to 2 MB.');
-    this.pyodide.FS.writeFile(`/home/pyodide/${name}`, bytes);
-  }
-  async runScript(source, name = 'uploaded-script.py', mode = 'loopback') {
-    if (!this.pyodide || this.busy) throw new Error('Wait until Python is ready.');
-    this.busy = true;
-    this.pyodide.globals.set('_source', source);
-    this.pyodide.globals.set('_script_name', name);
-    this.pyodide.globals.set('_mode', mode);
-    try {
-      await this.pyodide.runPythonAsync(`
-import channel, sys
-_previous_mode, _previous_args = channel.DEFAULT_MODE, sys.argv
-channel.DEFAULT_MODE, sys.argv = _mode, [_script_name]
-try:
-    exec(compile(_source, _script_name, "exec"), {"__name__": "__main__", "__file__": _script_name})
-finally:
-    channel.DEFAULT_MODE, sys.argv = _previous_mode, _previous_args
-`);
-    } finally {
-      ['_source', '_script_name', '_mode'].forEach(name => this.pyodide.globals.delete(name));
-      this.busy = false;
-    }
-  }
-  async close() { await this.audio.close(); }
 }
